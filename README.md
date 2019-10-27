@@ -6,7 +6,8 @@ requirements:
 
 - python3
 - selenium with chrome driver
-- 
+- requests
+- beautifulsoup4
 
 
 ```
