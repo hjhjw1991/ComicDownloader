@@ -7,11 +7,12 @@ def DownloadFromDmzj():
     downloader = DmzjComicDownloader()
     # 漫画id, 噬谎者
     name = "shz"
-    seedPage = "38249.shtml"
     seedMap = {
-        seedPage: 409
+        "38249.shtml": 409,
+        "42677.shtml": 428,
     }
-    pageStart = 410
+    seedPage = "42677.shtml"
+    pageStart = 429
     pageRange = 20
     pageMax = 530
 
