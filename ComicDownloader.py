@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding:utf-8 -*-
 
-from CheckUtil import HtmlQuery
+from hjutils.CheckUtil import HtmlQuery
 from bs4 import BeautifulSoup
 import os
 import re
@@ -36,9 +36,9 @@ class QQComicDownloader(HtmlQuery):
             for i in range(length):
                 url = pageUrls[i]
                 print('(%d/%d) downloading %s' % (i+1, length, url))
-                filename = re.findall(r'.*/(.+\.jpg)', url)
+                filename = re.findall(r'.*/(.+\.((jpe?g)|(png)))', url)
                 if filename:
-                    filename = str(i) + "_" + filename[0]
+                    filename = str(i) + "_" + filename[0][0]
                     try:
                         pic = requests.get(url, headers=header)
                         if pic.status_code == 200:
@@ -151,9 +151,9 @@ class DmzjComicDownloader(QQComicDownloader):
             for i in range(length):
                 url = pageUrls[i]
                 print('(%d/%d) downloading %s' % (i+1, length, url))
-                filename = re.findall(r'.*/(.+\.jpg)', url)
+                filename = re.findall(r'.*/(.+\.((jpe?g)|(png)))', url)
                 if filename:
-                    filename = str(i) + "_" + filename[0]
+                    filename = str(i) + "_" + filename[0][0]
                     print(filename)
                     try:
                         pic = requests.get(url, headers=header)
@@ -262,7 +262,7 @@ def testSelenium():
 
 def testDmzjDownloader():
     name = "shz"
-    seedPage = "38249"
+    seedPage = "51228"
     urlPtn = "https://manhua.dmzj.com/{}/{}.shtml"
     url = urlPtn.format(name, seedPage)
     downloader = DmzjComicDownloader()
@@ -272,5 +272,5 @@ def testDmzjDownloader():
 
 if __name__=='__main__':
     # use QQComicDownloader as default
-    cli()
-    # testDmzjDownloader()
+    # cli()
+    testDmzjDownloader()

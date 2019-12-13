@@ -10,9 +10,10 @@ def DownloadFromDmzj():
     seedMap = {
         "38249.shtml": 409,
         "42677.shtml": 428,
+        "51228.shtml": 448,
     }
     seedPage = "42677.shtml"
-    pageStart = 429
+    pageStart = 448
     pageRange = 20
     pageMax = 530
 
