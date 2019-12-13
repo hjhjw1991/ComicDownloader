@@ -1,6 +1,6 @@
-# QQComicDownloader
+# ComicDownloader
 
-download qq comic pics by simulating a client with selenium
+download comic pictures by simulating a client with selenium
 
 requirements:
 
@@ -12,8 +12,9 @@ requirements:
 
 ```
 usage:
-    python qq_comic_downloader.py -u https://ac.qq.com/ComicView/index/id/549573/cid/1
-    python qq_comic_downloader.py --url https://ac.qq.com/ComicView/index/id/549573/cid/1
+    python ComicDownloader.py -u https://ac.qq.com/ComicView/index/id/549573/cid/1
+    python ComicDownloader.py --url https://ac.qq.com/ComicView/index/id/549573/cid/1
 ```
 
-look for example in `example.py`
+For now it supports QQ comic and dmzj.
+Check `example.py` for detailed examples
