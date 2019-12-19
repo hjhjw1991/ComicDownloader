@@ -2,6 +2,7 @@
 
 from ComicDownloader import QQComicDownloader, DmzjComicDownloader
 
+import progressbar
 
 def DownloadFromDmzj():
     downloader = DmzjComicDownloader()
@@ -12,9 +13,9 @@ def DownloadFromDmzj():
         "42677.shtml": 428,
         "51228.shtml": 448,
     }
-    seedPage = "42677.shtml"
+    seedPage = "51228.shtml"
     pageStart = 448
-    pageRange = 20
+    pageRange = 2
     pageMax = 530
 
     # 初始化种子页面
@@ -49,14 +50,16 @@ def DownloadFromDmzj():
         return
 
     # 从起始页面开始下载, 到达终止页面或者没有下一页时停止
-    while currentVol < pageStart + pageRange:
-        downloader.download()
-        if not downloader.pages[currentVolUrl]['next']:
-            break
-        currentVolUrl = downloader.pages[currentVolUrl]['next']
-        currentVol += 1
-        url = urlPtn.format(name, currentVolUrl)
-        downloader.target(url)
+    with progressbar.ProgressBar(max_value=pageRange) as bar:
+        while currentVol < pageStart + pageRange:
+            bar.update(currentVol - pageStart)
+            downloader.download()
+            if not downloader.pages[currentVolUrl]['next']:
+                break
+            currentVolUrl = downloader.pages[currentVolUrl]['next']
+            currentVol += 1
+            url = urlPtn.format(name, currentVolUrl)
+            downloader.target(url)
 
 
 def DownloadFromQQComic():
@@ -67,7 +70,7 @@ def DownloadFromQQComic():
     # 起始话
     cidStart = 374
     # 每次下载的话数
-    cidRange = 20
+    cidRange = 2
     # 最大免费话数
     cidMax = 494
 
