@@ -225,6 +225,59 @@ class DmzjComicDownloader(QQComicDownloader):
             return []
 
 
+class GugumanhuaDownloader(DmzjComicDownloader):
+    """
+    古古漫画下载器
+    http://www.gugu5.com/o/miliuzhiguodeailisi/
+    """
+    host = "http://www.gugu5.com/"
+
+    def index(self, url):
+        self._driver.get(url)
+        html = self._driver.page_source.encode('utf-8')
+        bs = BeautifulSoup(html, features="html.parser")
+        playList = bs.find_all(name='div', attrs={'id': 'play_0'})
+        if playList:
+            div = playList[0]
+            pages = div.find_all(name='a')
+            for page in pages:
+                self.pages[page['title']] = page['href']
+
+    def resolve(self, response):
+        # response是目标漫画卷的阅读页html
+        # 每个页面的图片地址都是js计算出来的，所以我们模拟单页访问
+        # 找到选择控件，获得本话的图片数量，好加在页面参数里载入下一页
+        bs = BeautifulSoup(response, features="html.parser")
+        select = bs.find_all(name='select', attrs={'id': 'qTcms_select_i2'})
+        if select:
+            print('trying to retrieve all pages, please wait...')
+            matcher = re.compile(r'(.*/.+\.((jpe?g)|(png)))')
+            pages = select[0].find_all(name='option')
+            imgUrl = []
+            length = len(pages)
+            for i in range(length):
+                print("(%d/%d) I'm working, don't worry..." % (i, length))
+                page = pages[i]
+                p = page['value']
+                self._driver.get(self.api + '?p=' + p)
+                html = self._driver.page_source.encode('utf-8')
+                bs = BeautifulSoup(html, features="html.parser")
+                imgTable = bs.find_all(name='td', attrs={'id': 'qTcms_Pic_middle'})
+                if imgTable:
+                    imgTab = imgTable[0]
+                    img = imgTab.find_all(name='img')
+                    if not img:
+                        print('no comic found')
+                        continue
+                    url = matcher.findall(img[0]['src'])
+                    if url:
+                        imgUrl.append(url[0][0])
+            return imgUrl
+        else:
+            print('no comic found')
+            return []
+
+
 def startDownloadFromQQComic(url):
     downloader = QQComicDownloader()
     downloader.target(url)
@@ -270,7 +323,19 @@ def testDmzjDownloader():
     downloader.download()
 
 
+def testGuguDownloader():
+    name = "9678"
+    seedPage = "160757"
+    urlPtn = "http://www.gugu5.com/n/{}/{}.html"
+    index = "http://www.gugu5.com/o/miliuzhiguodeailisi/"
+    url = urlPtn.format(name, seedPage)
+    downloader = GugumanhuaDownloader()
+    downloader.index(index)
+    downloader.target(url)
+    downloader.download()
+
+
 if __name__=='__main__':
     # use QQComicDownloader as default
-    # cli()
-    testDmzjDownloader()
+    cli()
+    # testGuguDownloader()

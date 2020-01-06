@@ -1,8 +1,21 @@
 #!/usr/local/bin/python
 
-from ComicDownloader import QQComicDownloader, DmzjComicDownloader
+from ComicDownloader import QQComicDownloader, DmzjComicDownloader, GugumanhuaDownloader
 
 import progressbar
+
+
+def DownloadFromGugu():
+    downloader = GugumanhuaDownloader()
+    # 漫画目录页面，弥留之国的爱丽丝
+    index = "http://www.gugu5.com/o/miliuzhiguodeailisi/"
+    downloader.index(index)
+    for page in downloader.pages:
+        url = str.format('{}{}', downloader.host, downloader.pages[page])
+        print('downloading ' + page + ' from ' + url)
+        downloader.target(url)
+        downloader.download()
+
 
 def DownloadFromDmzj():
     downloader = DmzjComicDownloader()
@@ -12,6 +25,9 @@ def DownloadFromDmzj():
         "38249.shtml": 409,
         "42677.shtml": 428,
         "51228.shtml": 448,
+        "51232.shtml": 449,
+        "60194.shtml": 489,
+        "68394.shtml": 524,
     }
     seedPage = "51228.shtml"
     pageStart = 448
@@ -87,4 +103,5 @@ def DownloadFromQQComic():
 
 if __name__ == "__main__":
     # DownloadFromQQComic()
-    DownloadFromDmzj()
+    # DownloadFromDmzj()
+    DownloadFromGugu()
