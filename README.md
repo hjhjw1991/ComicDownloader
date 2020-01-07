@@ -16,5 +16,5 @@ usage:
     python ComicDownloader.py --url https://ac.qq.com/ComicView/index/id/549573/cid/1
 ```
 
-For now it supports QQ comic and dmzj.
+It supports: QQ comic/dmzj/gugu5  
 Check `example.py` for detailed examples
