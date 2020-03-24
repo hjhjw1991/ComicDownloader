@@ -13,6 +13,9 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import QUrl, QSize, pyqtSignal, QThread
 import os
+import re
+import qdarkstyle
+from ComicDownloader import QQComicDownloader
 
 
 class DownloadStatus:
@@ -25,11 +28,16 @@ class DownloadThread(QThread):
     name = ""
     seed = None
     count = 1
-    downloader = None
+    downloader = {
+        "https://ac.qq.com/": QQComicDownloader(), # qq下载器
+        "https://www.dmzj.com/": None,
+        "http://www.gugu5.com/": None,
+    }
     progress = 0
     progress_max = 100
     finish = False
     progressBarValue = pyqtSignal(int)
+    currentDownload = pyqtSignal(str)
 
     def __init__(self, seed="", count=1, target=None):
         super().__init__()
@@ -42,6 +50,33 @@ class DownloadThread(QThread):
         self.progressBarValue.emit(progress)
         if self.progress >= self.progress_max:
             self.finish = True
+
+    def download(self, type="https://ac.qq.com/", url="", count=1):
+        if url and type in self.downloader:
+            qqdownloader = self.downloader[type]
+            if "https://ac.qq.com/" != type:
+                # todo supprot other site
+                print("其他源暂不支持下载")
+            # 浏览路径的模式
+            urlPtn = "https://ac.qq.com/ComicView/index/id/{}/cid/{}"
+            pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+)"))
+            matched = pattern.search(url)
+            if matched:
+                comicId = int(matched.group(1))
+                cidStart = int(matched.group(2))
+                progress = 0
+                for id in range(cidStart, cidStart+count):
+                    progress += 1
+                    self.currentDownload.emit("第%d话" % id)
+                    url = urlPtn.format(comicId, id)
+                    qqdownloader.target(url)
+                    qqdownloader.download()
+                    # update progress ui
+                    self.update_progress(progress*100//count)
+
+    def save_and_exit(self):
+        # todo save and exit
+        self.finish = True
 
     def is_finished(self):
         return self.finish
@@ -124,7 +159,7 @@ class HJWindow(QWidget):
         "动漫之家": "https://www.dmzj.com/",
         "古古漫画网": "http://www.gugu5.com/",
     }
-    site = None
+    site = "https://ac.qq.com/"
 
     def __init__(self, title="HJ Window", parent=None):
         super().__init__(parent)
@@ -134,27 +169,7 @@ class HJWindow(QWidget):
         self.initUI()
         self.status = DownloadStatus.IDLE
 
-    def setupSkin(self):
-        BACKGROUND_COLOR = "#222222"
-        TITLE_COLOR = '#FFFF00'
-
-        Qss = 'QWidget#widget_2{background-color: %s;}' % BACKGROUND_COLOR
-        Qss += 'QWidget#widget{background-color: %s;border-top-right-radius:5 ;border-top-left-radius:5 ;}' % TITLE_COLOR
-        Qss += 'QWidget#widget_3{background-color: %s;}' % TITLE_COLOR
-        Qss += 'QPushButton#pushButton{background-color: %s;border-image:url(./img/btn_close_normal.png);border-top-right-radius:5 ;}' % TITLE_COLOR
-        Qss += 'QPushButton#pushButton:hover{border-image:url(./img/btn_close_down2.png); border-top-right-radius:5 ;}'
-        Qss += 'QPushButton#pushButton:pressed{border-image:url(./img/btn_close_down.png);border-top-right-radius:5 ;}'
-        Qss += 'QPushButton#pushButton_2{background-color: %s;border-image:url(./img/btn_min_normal.png);}' % TITLE_COLOR
-        Qss += 'QPushButton#pushButton_2:hover{background-color: %s;border-image:url(./img/btn_min_normal.png);}' % BACKGROUND_COLOR
-        Qss += 'QPushButton#pushButton_2:pressed{background-color: %s;border-top-left-radius:5 ;}' % BACKGROUND_COLOR
-        Qss += 'QPushButton#pushButton_3{background-color: %s;border-top-left-radius:5 ;border:0;}' % TITLE_COLOR
-        Qss += '#label{background-color:rbga(0,0,0,0);color: %s;}' % BACKGROUND_COLOR
-        self.setStyleSheet(Qss)  # 边框部分qss重载
-
     def initUI(self):
-        # 初始化窗口主题配色
-        self.setupSkin()
-
         # 控制区
         controller_layout = QGridLayout()
 
@@ -183,26 +198,28 @@ class HJWindow(QWidget):
 
         # 控制下载开始/暂停
         download_panel = QHBoxLayout()
-        start_btn = QPushButton()
-        start_btn.setStyleSheet("QPushButton{border-image: url(assets/play.png)}")
-        start_btn.clicked.connect(self._startDownload)
-        stop_btn = QPushButton()
+        download_ctr = QToolBar('Download')
+        download_ctr.setIconSize(QSize(16, 16))
+        start_btn = QAction(QIcon('assets/play.png'), 'start/pause', self)
+        start_btn.triggered.connect(self._startDownload)
+        stop_btn = QAction(QIcon('assets/stop.png'), 'stop', self)
         stop_btn.setVisible(False)
-        stop_btn.setStyleSheet("QPushButton{border-image: url(assets/stop.png)}")
-        stop_btn.clicked.connect(self._stopDownload)
-        download_panel.addWidget(start_btn)
-        download_panel.addWidget(stop_btn)
-        controller_layout.addItem(download_panel, 0, 6, 0, 9)
+        stop_btn.triggered.connect(self._stopDownload)
+        download_ctr.addAction(start_btn)
+        download_ctr.addAction(stop_btn)
+        download_panel.addWidget(download_ctr)
+        controller_layout.addItem(download_panel, 0, 6, 0, 8)
         self.startBtn = start_btn
         self.stopBtn = stop_btn
 
         # 下载进度
         download_status = QVBoxLayout()
-        download_progress_text = QLabel("progress now")
+        download_progress_text = QLabel("当前没有下载")
+        download_progress_text.setToolTip("当前下载")
         download_progress = QProgressBar()
         download_status.addWidget(download_progress_text)
         download_status.addWidget(download_progress)
-        controller_layout.addItem(download_status, 1, 0, 1, 9)
+        controller_layout.addItem(download_status, 2, 0, 2, 9)
         self.downloadProgress = download_progress
         self.downloadProgressText = download_progress_text
 
@@ -236,47 +253,57 @@ class HJWindow(QWidget):
             self.savePath.setText(choose_dialog)
 
     def _download(self):
+        # todo 断点续传
         import time
-        progress = 10
-        while not self.worker.is_finished() and self.status == DownloadStatus.DOWNLOADING:
+        save_path = self.savePath.text()
+        if os.path.exists(save_path) and os.path.isdir(save_path):
+            cwd = os.getcwd()
+            os.chdir(save_path)
             print("downloading")
-            self.worker.update_progress(progress)
-            progress += 10
-            time.sleep(1)
+            qurl = self.webview.browser.url()
+            self.worker.download(type=self.site, url=qurl.toString(), count=int(self.selectedRange.text()))
+            os.chdir(cwd)
+        else:
+            self._stopDownload()
 
     def _update_progress(self, progress):
-        # todo update progress bar and text
         self.downloadProgress.setValue(progress)
         if self.downloadProgress.value() >= self.downloadProgress.maximum():
             self._stopDownload()
 
+    def _update_progress_target(self, name):
+        if name:
+            self.downloadProgressText.setText(name)
+
     def _startDownload(self):
-        # todo pause/continue download
         if self.status == DownloadStatus.IDLE:
-            # start
+            # 创建线程开始下载
             self.status = DownloadStatus.DOWNLOADING
-            self.startBtn.setStyleSheet("QPushButton{border-image: url(assets/pause.png)}")
+            self.startBtn.setIcon(QIcon("assets/pause.png"))
             self.stopBtn.setVisible(True)
-            # self.worker.resume()
             self.worker = DownloadThread(target=self._download)
             self.worker.progressBarValue.connect(self._update_progress)
+            self.worker.currentDownload.connect(self._update_progress_target)
             self.worker.start()
         elif self.status == DownloadStatus.PAUSED:
-            # continue
+            # todo 继续下载
             self.status = DownloadStatus.DOWNLOADING
-            self.startBtn.setStyleSheet("QPushButton{border-image: url(assets/pause.png)}")
-            # self.worker.pause()
+            self.startBtn.setIcon(QIcon("assets/pause.png"))
+            # self.worker = DownloadThread(target=self._download)
+            # self.worker.progressBarValue.connect(self._update_progress)
+            # self.worker.start()
         elif self.status == DownloadStatus.DOWNLOADING:
-            # pause
+            # todo 暂停下载
             self.status = DownloadStatus.PAUSED
-            self.startBtn.setStyleSheet("QPushButton{border-image: url(assets/play.png)}")
-            # self.worker.resume()
+            self.startBtn.setIcon(QIcon("assets/play.png"))
+            # self.worker.save_and_exit()
 
     def _stopDownload(self):
-        # todo stop download
         self.status = DownloadStatus.IDLE
         self.stopBtn.setVisible(False)
-        self.startBtn.setStyleSheet("QPushButton{border-image: url(assets/play.png)}")
+        self.startBtn.setIcon(QIcon("assets/play.png"))
+        self._update_progress(0)
+        self._update_progress_target("当前没有下载")
         if self.worker:
             print(self.worker.isFinished())
 
@@ -285,6 +312,7 @@ if __name__ == '__main__':
     import sys
 
     app = QApplication(sys.argv)
+    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     window = HJWindow()
     window.show()
     sys.exit(app.exec_())
