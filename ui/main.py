@@ -15,7 +15,7 @@ from PyQt5.QtCore import QUrl, QSize, pyqtSignal, QThread
 import os
 import re
 import qdarkstyle
-from ComicDownloader import QQComicDownloader
+from ComicDownloader import QQComicDownloader, DmzjComicDownloader
 
 
 class DownloadStatus:
@@ -29,8 +29,8 @@ class DownloadThread(QThread):
     seed = None
     count = 1
     downloader = {
-        "https://ac.qq.com/": QQComicDownloader(), # qq下载器
-        "https://www.dmzj.com/": None,
+        "https://ac.qq.com/": QQComicDownloader(),  # qq下载器
+        "https://www.dmzj.com/": DmzjComicDownloader(),  # 动漫之家下载器
         "http://www.gugu5.com/": None,
     }
     progress = 0
@@ -53,26 +53,56 @@ class DownloadThread(QThread):
 
     def download(self, type="https://ac.qq.com/", url="", count=1):
         if url and type in self.downloader:
-            qqdownloader = self.downloader[type]
-            if "https://ac.qq.com/" != type:
-                # todo supprot other site
+            downloader = self.downloader[type]
+            if "https://ac.qq.com/" == type:
+                # 腾讯漫画
+                # 浏览路径的模式
+                urlPtn = "https://ac.qq.com/ComicView/index/id/{}/cid/{}"
+                pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+)"))
+                matched = pattern.search(url)
+                if matched:
+                    comicId = int(matched.group(1))
+                    pageStart = int(matched.group(2))
+                    progress = 0
+                    for id in range(pageStart, pageStart+count):
+                        progress += 1
+                        self.currentDownload.emit("第%d话" % id)
+                        url = urlPtn.format(comicId, id)
+                        downloader.target(url)
+                        downloader.download()
+                        # update progress ui
+                        self.update_progress(progress*100//count)
+            elif "https://www.dmzj.com/" == type:
+                # 动漫之家
+                urlPtn = "https://manhua.dmzj.com/{}/{}"
+                pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+\.shtml)"))
+                matched = pattern.search(url)
+                if matched:
+                    comicId = int(matched.group(1))
+                    pageStart = int(matched.group(2))
+                    currentVolUrl = pageStart
+                    url = urlPtn.format(comicId, pageStart)
+                    downloader.target(url)
+                    downloader.query()
+                    progress = 0
+                    for id in range(1, count+1):
+                        progress += 1
+                        self.currentDownload.emit("正在下载第%d话" % id)
+                        downloader.download()
+                        if not downloader.pages[currentVolUrl]['next']:
+                            break
+                        currentVolUrl = downloader.pages[currentVolUrl]['next']
+                        url = urlPtn.format(comicId, currentVolUrl)
+                        downloader.target(url)
+                        # update progress ui
+                        self.update_progress(progress*100//count)
+            elif "http://www.gugu5.com/" == type:
+                # 古古漫画网
+                pass
+            else:
                 print("其他源暂不支持下载")
-            # 浏览路径的模式
-            urlPtn = "https://ac.qq.com/ComicView/index/id/{}/cid/{}"
-            pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+)"))
-            matched = pattern.search(url)
-            if matched:
-                comicId = int(matched.group(1))
-                cidStart = int(matched.group(2))
-                progress = 0
-                for id in range(cidStart, cidStart+count):
-                    progress += 1
-                    self.currentDownload.emit("第%d话" % id)
-                    url = urlPtn.format(comicId, id)
-                    qqdownloader.target(url)
-                    qqdownloader.download()
-                    # update progress ui
-                    self.update_progress(progress*100//count)
+
+
 
     def save_and_exit(self):
         # todo save and exit
@@ -159,7 +189,7 @@ class HJWindow(QWidget):
         "动漫之家": "https://www.dmzj.com/",
         "古古漫画网": "http://www.gugu5.com/",
     }
-    site = "https://ac.qq.com/"
+    site = None
 
     def __init__(self, title="HJ Window", parent=None):
         super().__init__(parent)
@@ -182,6 +212,10 @@ class HJWindow(QWidget):
         select_range.setToolTip("从当前页面开始往后下载多少话")
         self.selector = selector
         self.selectedRange = select_range
+        value = self.selector.currentText()
+        if value in self.SITES:
+            self.site = self.SITES[value]
+
         controller_layout.addWidget(selector, 0, 0)
         controller_layout.addWidget(select_range, 1, 0)
 
