@@ -16,6 +16,7 @@ import os
 import re
 import qdarkstyle
 from ComicDownloader import QQComicDownloader, DmzjComicDownloader
+from hjutils.Exception import HJException
 
 
 class DownloadStatus:
@@ -51,12 +52,20 @@ class DownloadThread(QThread):
         if self.progress >= self.progress_max:
             self.finish = True
 
+    def cancel(self):
+        self.update_progress(100)
+
+    def onFailed(self):
+        self.currentDownload.emit("下载失败! 暂不支持该页面下载")
+        self.cancel()
+
     def download(self, type="https://ac.qq.com/", url="", count=1):
         if url and type in self.downloader:
             downloader = self.downloader[type]
             if "https://ac.qq.com/" == type:
                 # 腾讯漫画
                 # 浏览路径的模式
+                # 这里是为了提取漫画id和当前话, 以便遍历和组装新url
                 urlPtn = "https://ac.qq.com/ComicView/index/id/{}/cid/{}"
                 pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+)"))
                 matched = pattern.search(url)
@@ -66,41 +75,63 @@ class DownloadThread(QThread):
                     progress = 0
                     for id in range(pageStart, pageStart+count):
                         progress += 1
-                        self.currentDownload.emit("第%d话" % id)
+                        self.currentDownload.emit("正在下载第%d话" % id)
                         url = urlPtn.format(comicId, id)
                         downloader.target(url)
                         downloader.download()
                         # update progress ui
                         self.update_progress(progress*100//count)
+                else:
+                    self.onFailed()
+                    raise HJException("download failed! resolve pages failed")
             elif "https://www.dmzj.com/" == type:
                 # 动漫之家
-                urlPtn = "https://manhua.dmzj.com/{}/{}"
-                pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+\.shtml)"))
-                matched = pattern.search(url)
+                # 动漫之家的漫画浏览页面有两种pattern
+                # 一种是 https://manhua.dmzj.com/shz/2604.shtml#@page=1
+                # 另一种是 https://www.dmzj.com/view/baolieshenxianchuan/94356.html#@page=1
+                # 可能跟漫画是否被下架有关
+                # todo 两种模式的页面结构不同, 第一种模式当前已经支持, 第二种模式暂不支持
+                urlPtns = ["https://manhua.dmzj.com/{}/{}", "https://www.dmzj.com/view/{}/{}"]
+                urlPtn = urlPtns[0]
+                matched = None
+                for ptn in urlPtns:
+                    pattern = re.compile(ptn.format("([\w]+)", "([\d]+\.s?html)"))
+                    matched = pattern.search(url)
+                    if matched:
+                        break
                 if matched:
-                    comicId = int(matched.group(1))
-                    pageStart = int(matched.group(2))
+                    comicId = matched.group(1)
+                    pageStart = matched.group(2)
                     currentVolUrl = pageStart
                     url = urlPtn.format(comicId, pageStart)
                     downloader.target(url)
                     downloader.query()
+                    if currentVolUrl not in downloader.pages:
+                        self.onFailed()
+                        raise HJException("download failed! resolve pages failed")
                     progress = 0
                     for id in range(1, count+1):
                         progress += 1
                         self.currentDownload.emit("正在下载第%d话" % id)
                         downloader.download()
                         if not downloader.pages[currentVolUrl]['next']:
+                            # 已经没有下一话, 进度直接拉满, 正常结束
+                            self.update_progress(100)
                             break
                         currentVolUrl = downloader.pages[currentVolUrl]['next']
                         url = urlPtn.format(comicId, currentVolUrl)
                         downloader.target(url)
                         # update progress ui
                         self.update_progress(progress*100//count)
+                else:
+                    self.onFailed()
+                    raise HJException("download failed! resolve pages failed")
             elif "http://www.gugu5.com/" == type:
                 # 古古漫画网
-                pass
+                self.onFailed()
+                raise HJException("download failed! resolve pages failed")
             else:
-                print("其他源暂不支持下载")
+                self.onFailed()
 
     def save_and_exit(self):
         # todo save and exit
@@ -294,17 +325,20 @@ class HJWindow(QWidget):
 
     def _download(self):
         # todo 断点续传
-        import time
+        # NOTE 本方法在线程中执行, 不可直接调用会更新UI的其他方法!
         save_path = self.savePath.text()
         if os.path.exists(save_path) and os.path.isdir(save_path):
             cwd = os.getcwd()
             os.chdir(save_path)
             print("downloading")
             qurl = self.webview.browser.url()
-            self.worker.download(type=self.site, url=qurl.toString(), count=int(self.selectedRange.text()))
+            try:
+                self.worker.download(type=self.site, url=qurl.toString(), count=int(self.selectedRange.text()))
+            except HJException as hje:
+                print(hje)
             os.chdir(cwd)
         else:
-            self._stopDownload()
+            self.worker.cancel()
 
     def _update_progress(self, progress):
         self.downloadProgress.setValue(progress)
