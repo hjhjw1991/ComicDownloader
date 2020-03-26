@@ -102,8 +102,6 @@ class DownloadThread(QThread):
             else:
                 print("其他源暂不支持下载")
 
-
-
     def save_and_exit(self):
         # todo save and exit
         self.finish = True
@@ -116,12 +114,20 @@ class DownloadThread(QThread):
             self.target()
 
 
+class HJWebEngineView(QWebEngineView):
+
+    def createWindow(self, QWebEnginePage_WebWindowType):
+        # 重写创建新窗口的回调, 否则左键默认在新tab打开的链接会无法打开
+        # 但"返回自身"这种方式会导致新窗口丢失原窗口的cookie和缓存
+        return self
+
+
 class HJBrowser(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # 设置浏览器
-        self.browser = QWebEngineView()
+        self.browser = HJWebEngineView()
         layout = QVBoxLayout()
         layout.addWidget(self.browser)
         layout.addStretch(1)
