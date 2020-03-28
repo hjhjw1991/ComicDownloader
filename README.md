@@ -1,6 +1,6 @@
 # ComicDownloader
 
-download comic pictures by simulating a client with selenium
+download comic pictures by simulating a chrome client with selenium
 
 requirements:
 
@@ -8,6 +8,8 @@ requirements:
 - selenium with chrome driver
 - requests
 - beautifulsoup4
+- PyQt5=5.10 for GUI
+- qdarkstyle for GUI
 
 
 ```
@@ -17,4 +19,5 @@ usage:
 ```
 
 It supports: QQ comic/dmzj/gugu5  
-Check `example.py` for detailed examples
+check `cliexample.py` for command line examples. 
+run `ui/main.py`, which is our GUI. 
