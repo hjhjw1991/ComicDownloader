@@ -214,10 +214,13 @@ class DmzjComicDownloader(QQComicDownloader):
             nextPage = btmBtBox.find(name='a', attrs={'class': 'btm_chapter_btn fr'})
             if self.current and self.current not in self.pages:
                 self.pages[self.current] = {}
+                # 只取模板页面路径中缺失的部分, 在动漫之家就是只取html页面
                 if prevPage:
-                    self.pages[self.current]['prev'] = prevPage['href']
+                    prevHtml = re.findall(r'.*/(.+\.s?html)', prevPage['href'])
+                    self.pages[self.current]['prev'] = prevHtml[0] if prevHtml else None
                 if nextPage:
-                    self.pages[self.current]['next'] = nextPage['href']
+                    nextHtml = re.findall(r'.*/(.+\.s?html)', nextPage['href'])
+                    self.pages[self.current]['next'] = nextHtml[0] if nextHtml else None
                 print(self.current, self.pages[self.current])
             return imgUrl
         else:

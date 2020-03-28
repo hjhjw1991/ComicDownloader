@@ -90,7 +90,7 @@ class DownloadThread(QThread):
                 # 一种是 https://manhua.dmzj.com/shz/2604.shtml#@page=1
                 # 另一种是 https://www.dmzj.com/view/baolieshenxianchuan/94356.html#@page=1
                 # 可能跟漫画是否被下架有关
-                # todo 两种模式的页面结构不同, 第一种模式当前已经支持, 第二种模式暂不支持
+                # 目前两种模式都已支持
                 urlPtns = ["https://manhua.dmzj.com/{}/{}", "https://www.dmzj.com/view/{}/{}"]
                 urlPtn = urlPtns[0]
                 matched = None
@@ -98,6 +98,7 @@ class DownloadThread(QThread):
                     pattern = re.compile(ptn.format("([\w]+)", "([\d]+\.s?html)"))
                     matched = pattern.search(url)
                     if matched:
+                        urlPtn = ptn
                         break
                 if matched:
                     comicId = matched.group(1)
