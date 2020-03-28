@@ -1,4 +1,5 @@
 # ComicDownloader
+[![Build Status](https://www.travis-ci.org/hjhjw1991/ComicDownloader.svg?branch=master)](https://www.travis-ci.org/hjhjw1991/ComicDownloader)
 
 download comic pictures by simulating a chrome client with selenium
 
