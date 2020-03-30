@@ -32,7 +32,7 @@ class DownloadThread(QThread):
     downloader = {
         "https://ac.qq.com/": QQComicDownloader(),  # qq下载器
         "https://www.dmzj.com/": DmzjComicDownloader(),  # 动漫之家下载器
-        "http://www.gugu5.com/": None,
+        # "http://www.gugu5.com/": None,
     }
     progress = 0
     progress_max = 100
@@ -166,7 +166,7 @@ class HJBrowser(QWidget):
         # 添加浏览器到窗口中
         self.setLayout(layout)
 
-        ###使用QToolBar创建导航栏，并使用QAction创建按钮
+        # 使用QToolBar创建导航栏，并使用QAction创建按钮
         # 添加导航栏
         navigation_bar = QToolBar('Navigation')
         # 设定图标的大小
@@ -225,13 +225,13 @@ class HJWindow(QWidget):
     SITES = {
         "腾讯漫画": "https://ac.qq.com/",
         "动漫之家": "https://www.dmzj.com/",
-        "古古漫画网": "http://www.gugu5.com/",
+        # "古古漫画网": "http://www.gugu5.com/",
     }
     site = None
 
     def __init__(self, title="HJ Window", parent=None):
         super().__init__(parent)
-        self.setGeometry(200, 200, 800, 600)
+        self.setGeometry(200, 200, 1200, 900)
         self.setWindowTitle(title)
 
         self.initUI()
