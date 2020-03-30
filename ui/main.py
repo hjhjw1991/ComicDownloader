@@ -8,9 +8,9 @@ Created on 2020/3/20
 """
 
 from PyQt5.QtWidgets import QApplication, QComboBox, QSpinBox, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, \
-    QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, QAction, QToolBar
+    QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, QAction, QToolBar, QMainWindow
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import QUrl, QSize, pyqtSignal, QThread
 import os
 import re
@@ -32,7 +32,7 @@ class DownloadThread(QThread):
     downloader = {
         "https://ac.qq.com/": QQComicDownloader(),  # qq下载器
         "https://www.dmzj.com/": DmzjComicDownloader(),  # 动漫之家下载器
-        "http://www.gugu5.com/": None,
+        # "http://www.gugu5.com/": None,
     }
     progress = 0
     progress_max = 100
@@ -166,7 +166,7 @@ class HJBrowser(QWidget):
         # 添加浏览器到窗口中
         self.setLayout(layout)
 
-        ###使用QToolBar创建导航栏，并使用QAction创建按钮
+        # 使用QToolBar创建导航栏，并使用QAction创建按钮
         # 添加导航栏
         navigation_bar = QToolBar('Navigation')
         # 设定图标的大小
@@ -225,14 +225,13 @@ class HJWindow(QWidget):
     SITES = {
         "腾讯漫画": "https://ac.qq.com/",
         "动漫之家": "https://www.dmzj.com/",
-        "古古漫画网": "http://www.gugu5.com/",
+        # "古古漫画网": "http://www.gugu5.com/",
     }
     site = None
+    download_ctr_icon = {}
 
-    def __init__(self, title="HJ Window", parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.setGeometry(200, 200, 800, 600)
-        self.setWindowTitle(title)
 
         self.initUI()
         self.status = DownloadStatus.IDLE
@@ -272,9 +271,14 @@ class HJWindow(QWidget):
         download_panel = QHBoxLayout()
         download_ctr = QToolBar('Download')
         download_ctr.setIconSize(QSize(16, 16))
-        start_btn = QAction(QIcon('assets/play.png'), 'start/pause', self)
+        self.download_ctr_icon = {
+            'download': QIcon('assets/download.png'),
+            'pause': QIcon("assets/pause.png"),
+            'stop': QIcon('assets/stop.png'),
+        }
+        start_btn = QAction(self.download_ctr_icon['download'], 'start/pause download', self)
         start_btn.triggered.connect(self._startDownload)
-        stop_btn = QAction(QIcon('assets/stop.png'), 'stop', self)
+        stop_btn = QAction(self.download_ctr_icon['stop'], 'stop download', self)
         stop_btn.setVisible(False)
         stop_btn.triggered.connect(self._stopDownload)
         download_ctr.addAction(start_btn)
@@ -354,7 +358,7 @@ class HJWindow(QWidget):
         if self.status == DownloadStatus.IDLE:
             # 创建线程开始下载
             self.status = DownloadStatus.DOWNLOADING
-            self.startBtn.setIcon(QIcon("assets/pause.png"))
+            self.startBtn.setIcon(self.download_ctr_icon['pause'])
             self.stopBtn.setVisible(True)
             self.worker = DownloadThread(target=self._download)
             self.worker.progressBarValue.connect(self._update_progress)
@@ -363,24 +367,78 @@ class HJWindow(QWidget):
         elif self.status == DownloadStatus.PAUSED:
             # todo 继续下载
             self.status = DownloadStatus.DOWNLOADING
-            self.startBtn.setIcon(QIcon("assets/pause.png"))
+            self.startBtn.setIcon(self.download_ctr_icon['pause'])
             # self.worker = DownloadThread(target=self._download)
             # self.worker.progressBarValue.connect(self._update_progress)
             # self.worker.start()
         elif self.status == DownloadStatus.DOWNLOADING:
             # todo 暂停下载
             self.status = DownloadStatus.PAUSED
-            self.startBtn.setIcon(QIcon("assets/play.png"))
+            self.startBtn.setIcon(self.download_ctr_icon['download'])
             # self.worker.save_and_exit()
 
     def _stopDownload(self):
         self.status = DownloadStatus.IDLE
         self.stopBtn.setVisible(False)
-        self.startBtn.setIcon(QIcon("assets/play.png"))
+        self.startBtn.setIcon(self.download_ctr_icon['download'])
         self._update_progress(0)
         self._update_progress_target("当前没有下载")
         if self.worker:
             print(self.worker.isFinished())
+
+
+class HJMainWindow(QMainWindow):
+    subwindow = []
+
+    def __init__(self, title="HJ Window", parent=None):
+        super(HJMainWindow, self).__init__()
+        self.setCentralWidget(HJWindow(self))
+        self.setGeometry(200, 200, 1200, 900)
+        self.setWindowTitle(title)
+        self._createMenu()
+
+    def _createMenu(self):
+        menuBar = self.menuBar()
+        # # mac系统下需要禁用系统自带的菜单
+        # menuBar.setNativeMenubar(False)
+        about = menuBar.addMenu('about...')
+        qrcode = QAction('qrcode...', self)
+        about.addAction(qrcode)
+        about.triggered[QAction].connect(self._popupAbout)
+        self.aboutWindow = None
+
+        self.menubar = menuBar
+
+    def registerSubwindow(self, window):
+        if window not in self.subwindow:
+            self.subwindow.append(window)
+
+    def _popupAbout(self):
+        if not self.aboutWindow:
+            aboutWindow = HJPopupWindow('微信扫码关注')
+            imgName = 'assets/qrcode_for_wx_public_platform.jpg'
+            jpg = QPixmap(imgName).scaled(300, 300)
+            label = QLabel()
+            label.setPixmap(jpg)
+            layout = QHBoxLayout()
+            layout.addWidget(label)
+            aboutWindow.setGeometry(200, 200, 400, 400)
+            aboutWindow.setLayout(layout)
+            aboutWindow.setFixedSize(400, 400)
+            self.aboutWindow = aboutWindow
+            self.registerSubwindow(aboutWindow)
+        self.aboutWindow.show()
+
+    def closeEvent(self, QCloseEvent):
+        for win in self.subwindow:
+            win.close()
+        super(HJMainWindow, self).closeEvent(QCloseEvent)
+
+
+class HJPopupWindow(QWidget):
+    def __init__(self, name='HJ Popup Window'):
+        super(HJPopupWindow, self).__init__()
+        self.setWindowTitle(name)
 
 
 if __name__ == '__main__':
@@ -388,6 +446,6 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    window = HJWindow()
+    window = HJMainWindow()
     window.show()
     sys.exit(app.exec_())
