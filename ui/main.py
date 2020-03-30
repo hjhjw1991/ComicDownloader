@@ -228,6 +228,7 @@ class HJWindow(QWidget):
         # "古古漫画网": "http://www.gugu5.com/",
     }
     site = None
+    download_ctr_icon = {}
 
     def __init__(self, title="HJ Window", parent=None):
         super().__init__(parent)
@@ -272,9 +273,14 @@ class HJWindow(QWidget):
         download_panel = QHBoxLayout()
         download_ctr = QToolBar('Download')
         download_ctr.setIconSize(QSize(16, 16))
-        start_btn = QAction(QIcon('assets/play.png'), 'start/pause', self)
+        self.download_ctr_icon = {
+            'download': QIcon('assets/download.png'),
+            'pause': QIcon("assets/pause.png"),
+            'stop': QIcon('assets/stop.png'),
+        }
+        start_btn = QAction(self.download_ctr_icon['download'], 'start/pause download', self)
         start_btn.triggered.connect(self._startDownload)
-        stop_btn = QAction(QIcon('assets/stop.png'), 'stop', self)
+        stop_btn = QAction(self.download_ctr_icon['stop'], 'stop download', self)
         stop_btn.setVisible(False)
         stop_btn.triggered.connect(self._stopDownload)
         download_ctr.addAction(start_btn)
@@ -354,7 +360,7 @@ class HJWindow(QWidget):
         if self.status == DownloadStatus.IDLE:
             # 创建线程开始下载
             self.status = DownloadStatus.DOWNLOADING
-            self.startBtn.setIcon(QIcon("assets/pause.png"))
+            self.startBtn.setIcon(self.download_ctr_icon['pause'])
             self.stopBtn.setVisible(True)
             self.worker = DownloadThread(target=self._download)
             self.worker.progressBarValue.connect(self._update_progress)
@@ -363,20 +369,20 @@ class HJWindow(QWidget):
         elif self.status == DownloadStatus.PAUSED:
             # todo 继续下载
             self.status = DownloadStatus.DOWNLOADING
-            self.startBtn.setIcon(QIcon("assets/pause.png"))
+            self.startBtn.setIcon(self.download_ctr_icon['pause'])
             # self.worker = DownloadThread(target=self._download)
             # self.worker.progressBarValue.connect(self._update_progress)
             # self.worker.start()
         elif self.status == DownloadStatus.DOWNLOADING:
             # todo 暂停下载
             self.status = DownloadStatus.PAUSED
-            self.startBtn.setIcon(QIcon("assets/play.png"))
+            self.startBtn.setIcon(self.download_ctr_icon['download'])
             # self.worker.save_and_exit()
 
     def _stopDownload(self):
         self.status = DownloadStatus.IDLE
         self.stopBtn.setVisible(False)
-        self.startBtn.setIcon(QIcon("assets/play.png"))
+        self.startBtn.setIcon(self.download_ctr_icon['download'])
         self._update_progress(0)
         self._update_progress_target("当前没有下载")
         if self.worker:
