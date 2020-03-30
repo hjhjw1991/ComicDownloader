@@ -8,9 +8,9 @@ Created on 2020/3/20
 """
 
 from PyQt5.QtWidgets import QApplication, QComboBox, QSpinBox, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, \
-    QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, QAction, QToolBar
+    QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, QAction, QToolBar, QMainWindow
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import QUrl, QSize, pyqtSignal, QThread
 import os
 import re
@@ -230,10 +230,8 @@ class HJWindow(QWidget):
     site = None
     download_ctr_icon = {}
 
-    def __init__(self, title="HJ Window", parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.setGeometry(200, 200, 1200, 900)
-        self.setWindowTitle(title)
 
         self.initUI()
         self.status = DownloadStatus.IDLE
@@ -389,11 +387,65 @@ class HJWindow(QWidget):
             print(self.worker.isFinished())
 
 
+class HJMainWindow(QMainWindow):
+    subwindow = []
+
+    def __init__(self, title="HJ Window", parent=None):
+        super(HJMainWindow, self).__init__()
+        self.setCentralWidget(HJWindow(self))
+        self.setGeometry(200, 200, 1200, 900)
+        self.setWindowTitle(title)
+        self._createMenu()
+
+    def _createMenu(self):
+        menuBar = self.menuBar()
+        # # mac系统下需要禁用系统自带的菜单
+        # menuBar.setNativeMenubar(False)
+        about = menuBar.addMenu('about...')
+        qrcode = QAction('qrcode...', self)
+        about.addAction(qrcode)
+        about.triggered[QAction].connect(self._popupAbout)
+        self.aboutWindow = None
+
+        self.menubar = menuBar
+
+    def registerSubwindow(self, window):
+        if window not in self.subwindow:
+            self.subwindow.append(window)
+
+    def _popupAbout(self):
+        if not self.aboutWindow:
+            aboutWindow = HJPopupWindow('微信扫码关注')
+            imgName = 'assets/qrcode_for_wx_public_platform.jpg'
+            jpg = QPixmap(imgName).scaled(300, 300)
+            label = QLabel()
+            label.setPixmap(jpg)
+            layout = QHBoxLayout()
+            layout.addWidget(label)
+            aboutWindow.setGeometry(200, 200, 400, 400)
+            aboutWindow.setLayout(layout)
+            aboutWindow.setFixedSize(400, 400)
+            self.aboutWindow = aboutWindow
+            self.registerSubwindow(aboutWindow)
+        self.aboutWindow.show()
+
+    def closeEvent(self, QCloseEvent):
+        for win in self.subwindow:
+            win.close()
+        super(HJMainWindow, self).closeEvent(QCloseEvent)
+
+
+class HJPopupWindow(QWidget):
+    def __init__(self, name='HJ Popup Window'):
+        super(HJPopupWindow, self).__init__()
+        self.setWindowTitle(name)
+
+
 if __name__ == '__main__':
     import sys
 
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    window = HJWindow()
+    window = HJMainWindow()
     window.show()
     sys.exit(app.exec_())
