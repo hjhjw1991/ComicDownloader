@@ -216,10 +216,10 @@ class DmzjComicDownloader(QQComicDownloader):
                 self.pages[self.current] = {}
                 # 只取模板页面路径中缺失的部分, 在动漫之家就是只取html页面
                 if prevPage:
-                    prevHtml = re.findall(r'.*/(.+\.s?html)', prevPage['href'])
+                    prevHtml = re.findall(r'([\d]+\.s?html)', prevPage['href'])
                     self.pages[self.current]['prev'] = prevHtml[0] if prevHtml else None
                 if nextPage:
-                    nextHtml = re.findall(r'.*/(.+\.s?html)', nextPage['href'])
+                    nextHtml = re.findall(r'([\d]+\.s?html)', nextPage['href'])
                     self.pages[self.current]['next'] = nextHtml[0] if nextHtml else None
                 print(self.current, self.pages[self.current])
             return imgUrl
