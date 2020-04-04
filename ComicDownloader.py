@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 
 from hjutils.CheckUtil import HtmlQuery
+from hjutils.ColoredLog import LOGE, LOGV
 from bs4 import BeautifulSoup
 import os
 import re
@@ -11,12 +12,13 @@ class QQComicDownloader(HtmlQuery):
     _driver = None
     api = ""
     save_path = ""
+    cookie = {}
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
         from selenium import webdriver
         option = webdriver.ChromeOptions()
-        option.add_argument('--headless')
+        option.add_argument('--headless')  # hide browser window
         self._driver = webdriver.Chrome(options=option)
 
     def target(self, url):
@@ -30,7 +32,7 @@ class QQComicDownloader(HtmlQuery):
         if pageUrls:
             self.createDir(self._driver.title)
             if not os.path.exists(self.save_path):
-                print('create dir %s failed!' % self.save_path)
+                LOGE('create dir %s failed!' % self.save_path)
                 return
             length = len(pageUrls)
             for i in range(length):
@@ -46,7 +48,7 @@ class QQComicDownloader(HtmlQuery):
                                 fp.write(pic.content)
                                 fp.close()
                     except Exception as e:
-                        print(e)
+                        LOGE(e)
         print('download finished!')
 
     def createDir(self, name):
@@ -58,6 +60,11 @@ class QQComicDownloader(HtmlQuery):
         self.save_path = path
 
     def sendQueryRequest(self, **kwargs):
+        # passing cookie
+        # 先请求一次目标url, 刷新cookie的默认domain, 否则默认域是data: 会导致添加cookie报错
+        self._driver.get(self.api)
+        for name, value in self.cookie.items():
+            self._driver.add_cookie({'name': name, 'value': value})
         # 网页内容是动态渲染的，所以我们需要模拟用户访问，让网页渲染出来
         self._driver.get(self.api)
         # 由于页面内容是懒加载，所以我们需要模拟滑动到页面底部来完成全部图片的加载
@@ -71,7 +78,7 @@ class QQComicDownloader(HtmlQuery):
         # 获取漫画页数
         pageList = bs.find_all(name='ul', attrs={'class': 'comic-contain'})
         if not pageList:
-            print('no comic found')
+            LOGV('no comic found')
             return []
         pages = pageList[0].find_all(name='li')
         # 每个分页高度
@@ -105,7 +112,7 @@ class QQComicDownloader(HtmlQuery):
         bs = BeautifulSoup(response, features="html.parser")
         pageList = bs.find_all(name='ul', attrs={'class': 'comic-contain'})
         if not pageList:
-            print('no comic found')
+            LOGV('no comic found')
             return []
         pages = pageList[0].find_all(name='li')
         imgUrl = []
@@ -124,8 +131,8 @@ class DmzjComicDownloader(QQComicDownloader):
     图片的网络请求需要携带来源页面的Referer，否则会被403
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.current = None
         self.pages = {}
 
@@ -143,7 +150,7 @@ class DmzjComicDownloader(QQComicDownloader):
         if pageUrls:
             self.createDir(self._driver.title)
             if not os.path.exists(self.save_path):
-                print('create dir %s failed!' % self.save_path)
+                LOGE('create dir %s failed!' % self.save_path)
                 return
             length = len(pageUrls)
             # 每一张图片下载间隔
@@ -162,9 +169,9 @@ class DmzjComicDownloader(QQComicDownloader):
                                 fp.write(pic.content)
                                 fp.close()
                         else:
-                            print("Error: " + str(pic.status_code))
+                            LOGV("Error: " + str(pic.status_code))
                     except Exception as e:
-                        print(e)
+                        LOGE(e)
                     import time
                     time.sleep(wait / 1000)
 
@@ -179,6 +186,11 @@ class DmzjComicDownloader(QQComicDownloader):
         self.save_path = path
 
     def sendQueryRequest(self, **kwargs):
+        # passing cookie
+        # 先请求一次目标url, 刷新cookie的默认domain, 否则默认域是data: 会导致添加cookie报错
+        self._driver.get(self.api)
+        for name, value in self.cookie.items():
+            self._driver.add_cookie({'name': name, 'value': value})
         # 网页内容是动态渲染的，所以我们需要模拟用户访问，让网页渲染出来，但是动漫之家不需要等页面加载完毕
         self._driver.get(self.api)
         html = self._driver.page_source.encode('utf-8')
@@ -194,7 +206,7 @@ class DmzjComicDownloader(QQComicDownloader):
             btmBtBox = bottomBtBox[0]
             pageList = btmBtBox.find_all(name='select', attrs={'id': 'page_select'})
             if not pageList:
-                print('no comic found')
+                LOGV('no comic found')
                 return []
             pages = pageList[0].find_all(name='option')
             imgUrl = []
@@ -221,10 +233,10 @@ class DmzjComicDownloader(QQComicDownloader):
                 if nextPage:
                     nextHtml = re.findall(r'([\d]+\.s?html)', nextPage['href'])
                     self.pages[self.current]['next'] = nextHtml[0] if nextHtml else None
-                print(self.current, self.pages[self.current])
+                LOGV(self.current, self.pages[self.current])
             return imgUrl
         else:
-            print('no comic found')
+            LOGV('no comic found')
             return []
 
 
@@ -270,14 +282,14 @@ class GugumanhuaDownloader(DmzjComicDownloader):
                     imgTab = imgTable[0]
                     img = imgTab.find_all(name='img')
                     if not img:
-                        print('no comic found')
+                        LOGV('no comic found')
                         continue
                     url = matcher.findall(img[0]['src'])
                     if url:
                         imgUrl.append(url[0][0])
             return imgUrl
         else:
-            print('no comic found')
+            LOGV('no comic found')
             return []
 
 

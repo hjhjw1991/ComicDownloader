@@ -9,7 +9,7 @@ Created on 2020/3/20
 
 from PyQt5.QtWidgets import QApplication, QComboBox, QSpinBox, QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, \
     QLabel, QLineEdit, QPushButton, QProgressBar, QFileDialog, QAction, QToolBar, QMainWindow
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import QUrl, QSize, pyqtSignal, QThread
 import os
@@ -17,6 +17,7 @@ import re
 import qdarkstyle
 from ComicDownloader import QQComicDownloader, DmzjComicDownloader
 from hjutils.Exception import HJException
+from hjutils.ColoredLog import LOGV, LOGD, LOGE
 
 
 class DownloadStatus:
@@ -40,11 +41,15 @@ class DownloadThread(QThread):
     progressBarValue = pyqtSignal(int)
     currentDownload = pyqtSignal(str)
 
-    def __init__(self, seed="", count=1, target=None):
+    def __init__(self, seed="", count=1, target=None, **kwargs):
         super().__init__()
         self.seed = seed
         self.count = count
         self.target = target
+        if 'cookie' in kwargs:
+            self.cookie = kwargs['cookie']
+        else:
+            self.cookie = None
 
     def update_progress(self, progress):
         self.progress = progress
@@ -62,10 +67,14 @@ class DownloadThread(QThread):
     def download(self, type="https://ac.qq.com/", url="", count=1):
         if url and type in self.downloader:
             downloader = self.downloader[type]
+            downloader.cookie = self.cookie
+            LOGD('cookie')
+            LOGD(downloader.cookie)
             if "https://ac.qq.com/" == type:
                 # 腾讯漫画
                 # 浏览路径的模式
                 # 这里是为了提取漫画id和当前话, 以便遍历和组装新url
+                # fixme 从个人中心书架点进漫画页时, 最后一段cid会变成seqno导致匹配不上(切换一下页面可恢复正常)
                 urlPtn = "https://ac.qq.com/ComicView/index/id/{}/cid/{}"
                 pattern = re.compile(urlPtn.format("([\d]+)", "([\d]+)"))
                 matched = pattern.search(url)
@@ -115,7 +124,7 @@ class DownloadThread(QThread):
                         progress += 1
                         self.currentDownload.emit("正在下载第%d话" % id)
                         downloader.download()
-                        if not downloader.pages[currentVolUrl]['next']:
+                        if 'next' not in downloader.pages[currentVolUrl]:
                             # 已经没有下一话, 进度直接拉满, 正常结束
                             self.update_progress(100)
                             break
@@ -148,10 +157,33 @@ class DownloadThread(QThread):
 
 class HJWebEngineView(QWebEngineView):
 
+    def __init__(self, *args, **kwargs):
+        super(HJWebEngineView, self).__init__(*args, **kwargs)
+        self._cookie = {}
+        QWebEngineProfile.defaultProfile().cookieStore().cookieAdded.connect(self.onCookieAdd)
+
+    def onCookieAdd(self, cookie):
+        name = cookie.name().data().decode('utf-8')
+        value = cookie.value().data().decode('utf-8')
+        self._cookie[name] = value
+
     def createWindow(self, QWebEnginePage_WebWindowType):
         # 重写创建新窗口的回调, 否则左键默认在新tab打开的链接会无法打开
         # 但"返回自身"这种方式会导致新窗口丢失原窗口的cookie和缓存
         return self
+
+    @property
+    def cookie(self):
+        # cookie_str = ''
+        # for key,value in self._cookie.items():
+        #     cookie_str += (key + '=' + value + ';')
+        # return cookie_str
+        return self._cookie
+
+    @cookie.setter
+    def cookie(self, value):
+        if isinstance(value, dict):
+            self._cookie = value
 
 
 class HJBrowser(QWidget):
@@ -219,6 +251,14 @@ class HJBrowser(QWidget):
     def load(self, url):
         if url:
             self.browser.load(QUrl(url))
+
+    @property
+    def cookie(self):
+        return self.browser.cookie
+
+    @cookie.setter
+    def cookie(self, value):
+        self.browser.cookie = value
 
 
 class HJWindow(QWidget):
@@ -325,7 +365,7 @@ class HJWindow(QWidget):
                                                          "选取文件夹",
                                                          self.savePath.text())
         if choose_dialog:
-            print(choose_dialog)
+            LOGD(choose_dialog)
             self.savePath.setText(choose_dialog)
 
     def _download(self):
@@ -335,12 +375,15 @@ class HJWindow(QWidget):
         if os.path.exists(save_path) and os.path.isdir(save_path):
             cwd = os.getcwd()
             os.chdir(save_path)
-            print("downloading")
+            LOGV("downloading")
             qurl = self.webview.browser.url()
             try:
                 self.worker.download(type=self.site, url=qurl.toString(), count=int(self.selectedRange.text()))
             except HJException as hje:
-                print(hje)
+                LOGE("""
+%s
+    at %s (%d)""" % (hje, hje.__traceback__.tb_frame.f_globals["__file__"],   # 发生异常所在的文件
+                     hje.__traceback__.tb_lineno))                              # 发生异常所在的行数
             os.chdir(cwd)
         else:
             self.worker.cancel()
@@ -360,7 +403,7 @@ class HJWindow(QWidget):
             self.status = DownloadStatus.DOWNLOADING
             self.startBtn.setIcon(self.download_ctr_icon['pause'])
             self.stopBtn.setVisible(True)
-            self.worker = DownloadThread(target=self._download)
+            self.worker = DownloadThread(target=self._download, cookie=self.webview.cookie)
             self.worker.progressBarValue.connect(self._update_progress)
             self.worker.currentDownload.connect(self._update_progress_target)
             self.worker.start()
@@ -384,7 +427,7 @@ class HJWindow(QWidget):
         self._update_progress(0)
         self._update_progress_target("当前没有下载")
         if self.worker:
-            print(self.worker.isFinished())
+            LOGD(self.worker.isFinished())
 
 
 class HJMainWindow(QMainWindow):
