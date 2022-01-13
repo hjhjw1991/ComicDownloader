@@ -4,6 +4,6 @@ QDarkStyle==2.8.1
 requests==2.22.0
 Js2Py==0.67
 beautifulsoup4==4.8.2
-Pillow==7.0.0
+Pillow==9.0.0
 progressbar2==3.47.0
 PyQt5==5.10
